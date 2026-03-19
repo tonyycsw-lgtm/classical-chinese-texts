@@ -1,0 +1,45 @@
+{
+  "unitName": "論語·學而篇",
+  "article": {
+    "title": "論語·學而篇",
+    "paragraphs": [
+      {
+        "slices": [
+          {
+            "text": "子曰：",
+            "translation": "孔子說：",
+            "vocabIds": [1]
+          },
+          {
+            "text": "學而時習之，",
+            "translation": "學習後時常溫習，",
+            "vocabIds": [2, 3]
+          },
+          {
+            "text": "不亦說乎？",
+            "translation": "不也很喜悅嗎？",
+            "vocabIds": [4]
+          }
+        ],
+        "implication": {
+          "summary": "論學習的樂趣",
+          "paraphrase": "學習並且經常複習，是件快樂的事",
+          "grammar": "反問句式「不亦…乎」表示肯定"
+        }
+      }
+    ]
+  },
+  "vocabulary": [
+    {"id": 1, "word": "子", "meaning": "古代對男子的尊稱，這裡指孔子"},
+    {"id": 2, "word": "學", "meaning": "學習"},
+    {"id": 3, "word": "時習", "meaning": "時常溫習"},
+    {"id": 4, "word": "說", "meaning": "同「悅」，喜悅"}
+  ],
+  "metadata": {
+    "category": "儒家經典",
+    "author": "孔子",
+    "period": "春秋",
+    "difficulty": "基礎",
+    "tags": ["論語", "儒家"]
+  }
+}
