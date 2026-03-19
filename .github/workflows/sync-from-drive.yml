@@ -5,12 +5,17 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write  # 授予寫入權限
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # 升級到 v4 解決警告
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # 使用內建的 token
 
       - name: Create data directory
         run: mkdir -p docs/data
@@ -19,10 +24,7 @@ jobs:
         env:
           FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
-          # 安裝 gdown
           pip install gdown
-          
-          # 使用 gdown 下載整個資料夾
           gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok
 
       - name: Create index file
@@ -30,24 +32,23 @@ jobs:
           cd docs/data
           echo "[" > units-index.json
           first=true
-          for file in *.json; do
-            if [ "$file" != "units-index.json" ]; then
+          for file in *.json *.txt; do
+            if [ "$file" != "units-index.json" ] && [ -f "$file" ]; then
               if [ "$first" = true ]; then
                 first=false
               else
                 echo "," >> units-index.json
               fi
-              filename=$(basename "$file" .json)
+              filename=$(basename "$file" .${file##*.})
               echo "  {\"unitId\": \"$filename\", \"unitName\": \"$filename\", \"fileName\": \"$file\"}" >> units-index.json
             fi
           done
           echo "]" >> units-index.json
-          cat units-index.json  # 顯示索引內容以便除錯
 
       - name: Commit and push changes
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add docs/data/
           if git diff --staged --quiet; then
             echo "沒有檔案變更"
