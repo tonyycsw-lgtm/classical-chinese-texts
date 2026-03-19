@@ -389,8 +389,8 @@ function refreshUnitSelect(filteredUnits = null) {
   select.innerHTML = '<option value="">請選擇課文</option>';
 
   let unitsToShow = [];
-  let hasAnyUnits = false;
 
+  // 1. 加入上傳的單元（來自 localStorage）
   const uploadedUnitsMap = core.getAllUnits();
   const uploadedUnits = Object.entries(uploadedUnitsMap).map(([id, unit]) => ({
     id,
@@ -398,26 +398,21 @@ function refreshUnitSelect(filteredUnits = null) {
     data: unit.data,
     type: 'upload'
   }));
+  unitsToShow.push(...uploadedUnits);
 
-  // 如果有篩選條件，則只顯示符合條件的單元
-  if (filteredUnits && filteredUnits.length > 0) {
-    const filteredIds = new Set(filteredUnits.map(u => u.id));
-    unitsToShow = uploadedUnits.filter(u => filteredIds.has(u.id));
-    
-    if (unitsToShow.length > 0) {
-      hasAnyUnits = true;
-    }
-  } 
-  // 如果沒有篩選條件，顯示所有單元
-  else {
-    unitsToShow = [...uploadedUnits];
-    if (uploadedUnits.length > 0) {
-      hasAnyUnits = true;
-    }
+  // 2. 加入索引單元（來自 units-index.json）- ⚠️ 這是新增的部分
+  if (window.unitsIndex && window.unitsIndex.length > 0) {
+    const indexUnits = window.unitsIndex.map(item => ({
+      id: item.unitId,
+      name: item.unitName || item.unitId,
+      fileName: item.fileName,
+      type: 'index'
+    }));
+    unitsToShow.push(...indexUnits);
   }
 
   // 如果完全沒有任何單元可顯示
-  if (!hasAnyUnits || unitsToShow.length === 0) {
+  if (unitsToShow.length === 0) {
     select.innerHTML = '<option value="">沒有可用的課文</option>';
     return;
   }
@@ -440,7 +435,14 @@ function refreshUnitSelect(filteredUnits = null) {
     const option = document.createElement('option');
     option.value = item.id;
     option.textContent = item.name;
-    option.dataset.data = JSON.stringify(item.data);
+    
+    if (item.type === 'upload') {
+      option.dataset.data = JSON.stringify(item.data);
+    } else if (item.type === 'index') {
+      // 索引單元不需要 dataset.data，會透過 loadUnitById 載入
+      option.dataset.index = 'true';
+    }
+    
     select.appendChild(option);
   });
 
@@ -449,7 +451,6 @@ function refreshUnitSelect(filteredUnits = null) {
     select.value = currentValue;
   }
 }
-
   // ========== 完整篩選 UI ==========
   function buildCategoryFilters() {
     const container = document.getElementById('filter-container');
