@@ -1,0 +1,53 @@
+name: Sync from Google Drive
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create data directory
+        run: mkdir -p docs/data
+
+      - name: Install gdown
+        run: pip install gdown
+
+      - name: Download from Google Drive
+        env:
+          FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: |
+          gdown --folder https://drive.google.com/drive/folders/$FOLDER_ID -O docs/data/ --remaining-ok
+
+      - name: Create index file
+        run: |
+          cd docs/data
+          echo "[" > units-index.json
+          first=true
+          for file in *.json; do
+            if [ "$file" != "units-index.json" ]; then
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo "," >> units-index.json
+              fi
+              filename=$(basename "$file" .json)
+              echo "  {\"unitId\": \"$filename\", \"unitName\": \"$filename\", \"fileName\": \"$file\"}" >> units-index.json
+            fi
+          done
+          echo "]" >> units-index.json
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/data/
+          git diff --quiet && git diff --staged --quiet || git commit -m "自動同步 Google Drive 課文"
+          git push
