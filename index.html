@@ -1276,7 +1276,7 @@
   // 載入索引檔
   async function loadUnitsIndex() {
     try {
-      const response = await fetch('./data/units-index.json');
+      const response = await fetch('./docs/data/units-index.json');
       unitsIndex = await response.json();
       
       // 重新整理下拉選單（由 UI 增強模組處理）
