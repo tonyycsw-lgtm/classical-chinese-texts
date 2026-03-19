@@ -1296,36 +1296,37 @@
     }
   }
 
-  async function loadUnitById(unitId) {
-    const unit = unitsIndex.find(u => u.unitId === unitId);
-    if (!unit) return;
-    
-    try {
-      const response = await fetch(unit.dataUrl);
-      const data = await response.json();
-      Renderer.renderAll(data, unit.unitId);
-    } catch (e) {
-      console.error('載入課文失敗', e);
-      alert('無法載入課文：' + unit.unitName);
-    }
+async function loadUnitById(unitId) {
+  const unit = unitsIndex.find(u => u.unitId === unitId);
+  if (!unit) return;
+  
+  try {
+    // 使用 fileName 而不是 dataUrl
+    const response = await fetch(`./docs/data/${unit.fileName}`);
+    const data = await response.json();
+    Renderer.renderAll(data, unit.unitId);
+  } catch (e) {
+    console.error('載入課文失敗', e);
+    alert('無法載入課文：' + unit.unitName);
   }
+}
 
-  // 下拉選單變更事件（同時處理上傳單元和索引單元）
-  document.getElementById('unit-select').addEventListener('change', function(e) {
-    const selectedOption = e.target.options[e.target.selectedIndex];
-    const unitId = selectedOption.value;
-    
-    if (!unitId) return;
-    
-    // 檢查是否為上傳的單元（有 dataset.data）
-    if (selectedOption.dataset.data) {
-      const data = JSON.parse(selectedOption.dataset.data);
-      Renderer.renderAll(data, unitId);
-    } else if (selectedOption.dataset.url) {
-      // 原本的載入方式（從伺服器獲取）
-      loadUnitById(unitId);
-    }
-  });
+// 下拉選單變更事件
+document.getElementById('unit-select').addEventListener('change', function(e) {
+  const selectedOption = e.target.options[e.target.selectedIndex];
+  const unitId = selectedOption.value;
+  
+  if (!unitId) return;
+  
+  // 如果是上傳的單元（有 dataset.data）
+  if (selectedOption.dataset.data) {
+    const data = JSON.parse(selectedOption.dataset.data);
+    Renderer.renderAll(data, unitId);
+  } else {
+    // 否則從索引載入（不再檢查 dataset.url）
+    loadUnitById(unitId);
+  }
+});
 
   window.addEventListener('unhandledrejection', function(event) {
     if (event.reason && event.reason.message && 
