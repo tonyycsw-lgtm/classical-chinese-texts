@@ -1,8 +1,6 @@
 name: Sync from Google Drive
 
 on:
-  schedule:
-    - cron: '0 */3 * * *'
   workflow_dispatch:
   push:
     branches: [ main ]
@@ -12,19 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 升級到 v4 解決警告
 
       - name: Create data directory
         run: mkdir -p docs/data
 
-      - name: Install gdown
-        run: pip install gdown
-
-      - name: Download from Google Drive
+      - name: Download files from Google Drive
         env:
           FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
-          gdown --folder https://drive.google.com/drive/folders/$FOLDER_ID -O docs/data/ --remaining-ok
+          # 安裝 gdown
+          pip install gdown
+          
+          # 使用 gdown 下載整個資料夾
+          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok
 
       - name: Create index file
         run: |
@@ -43,11 +42,16 @@ jobs:
             fi
           done
           echo "]" >> units-index.json
+          cat units-index.json  # 顯示索引內容以便除錯
 
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add docs/data/
-          git diff --quiet && git diff --staged --quiet || git commit -m "自動同步 Google Drive 課文"
-          git push
+          if git diff --staged --quiet; then
+            echo "沒有檔案變更"
+          else
+            git commit -m "自動同步 Google Drive 課文"
+            git push
+          fi
