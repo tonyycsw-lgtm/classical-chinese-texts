@@ -1274,27 +1274,35 @@
   };
 
   // 載入索引檔
-  async function loadUnitsIndex() {
-    try {
-      const response = await fetch('./docs/data/units-index.json');
-      unitsIndex = await response.json();
-      
-      // 重新整理下拉選單（由 UI 增強模組處理）
-      if (window.DSEUIEnhancements) {
-        window.DSEUIEnhancements.refreshUnitSelect();
-      }
-      
-      // 如果選單中還沒有任何選取，且 unitsIndex 有資料，預設載入第一個
-      const select = document.getElementById('unit-select');
-      if (select.options.length > 1 && !select.value) {
-        // 可以選擇載入第一個索引單元
-        // 但為了避免自動載入造成困擾，可讓使用者自行選擇
-      }
-    } catch (e) {
-      console.error('載入索引檔失敗', e);
-      document.getElementById('unit-select').innerHTML = '<option value="">未載入索引</option>';
+async function loadUnitsIndex() {
+  try {
+    const response = await fetch('./docs/data/units-index.json');
+    unitsIndex = await response.json();
+    
+    console.log('索引檔載入成功，共', unitsIndex.length, '篇課文');
+    
+    // 重新整理下拉選單（由 UI 增強模組處理）
+    if (window.DSEUIEnhancements) {
+      window.DSEUIEnhancements.refreshUnitSelect();
     }
+    
+    // 自動載入第一個課文（如果有的話）
+    const select = document.getElementById('unit-select');
+    if (unitsIndex.length > 0) {
+      // 等待一下讓下拉選單更新
+      setTimeout(() => {
+        if (select.options.length > 1) {
+          select.value = unitsIndex[0].unitId;
+          // 手動觸發 change 事件
+          select.dispatchEvent(new Event('change'));
+        }
+      }, 100);
+    }
+  } catch (e) {
+    console.error('載入索引檔失敗', e);
+    document.getElementById('unit-select').innerHTML = '<option value="">未載入索引</option>';
   }
+}
 
 async function loadUnitById(unitId) {
   const unit = unitsIndex.find(u => u.unitId === unitId);
