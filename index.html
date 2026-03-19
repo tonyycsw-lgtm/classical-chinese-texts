@@ -1273,7 +1273,7 @@
     }
   };
 
-  // 載入索引檔
+// 載入索引檔
 async function loadUnitsIndex() {
   try {
     const response = await fetch('./docs/data/units-index.json');
@@ -1281,23 +1281,33 @@ async function loadUnitsIndex() {
     
     console.log('索引檔載入成功，共', unitsIndex.length, '篇課文');
     
-    // 重新整理下拉選單（由 UI 增強模組處理）
-    if (window.DSEUIEnhancements) {
-      window.DSEUIEnhancements.refreshUnitSelect();
+    // 方法1: 直接手動建立下拉選單（最可靠）
+    const select = document.getElementById('unit-select');
+    select.innerHTML = '<option value="">請選擇課文</option>';
+    
+    // 手動加入選項
+    unitsIndex.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.unitId;
+      option.textContent = item.unitName || item.unitId;
+      option.dataset.fileName = item.fileName;
+      select.appendChild(option);
+    });
+    
+    // 自動載入第一個課文
+    if (unitsIndex.length > 0) {
+      select.value = unitsIndex[0].unitId;
+      // 手動載入課文
+      loadUnitById(unitsIndex[0].unitId);
     }
     
-    // 自動載入第一個課文（如果有的話）
-    const select = document.getElementById('unit-select');
-    if (unitsIndex.length > 0) {
-      // 等待一下讓下拉選單更新
+    // 方法2: 同時也呼叫 UI 增強模組（可選）
+    if (window.DSEUIEnhancements) {
       setTimeout(() => {
-        if (select.options.length > 1) {
-          select.value = unitsIndex[0].unitId;
-          // 手動觸發 change 事件
-          select.dispatchEvent(new Event('change'));
-        }
-      }, 100);
+        window.DSEUIEnhancements.refreshUnitSelect();
+      }, 200);
     }
+    
   } catch (e) {
     console.error('載入索引檔失敗', e);
     document.getElementById('unit-select').innerHTML = '<option value="">未載入索引</option>';
