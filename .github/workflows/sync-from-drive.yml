@@ -25,7 +25,7 @@ jobs:
           FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           pip install gdown
-          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok
+          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok --no-copy-folder-structure
 
       - name: Create index file
         run: |
