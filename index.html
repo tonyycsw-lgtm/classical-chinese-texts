@@ -1302,11 +1302,11 @@ async function loadUnitsIndex() {
     }
     
     // 方法2: 同時也呼叫 UI 增強模組（可選）
-    if (window.DSEUIEnhancements) {
-      setTimeout(() => {
-        window.DSEUIEnhancements.refreshUnitSelect();
-      }, 200);
-    }
+   // if (window.DSEUIEnhancements) {
+   //   setTimeout(() => {
+ //       window.DSEUIEnhancements.refreshUnitSelect();
+  //    }, 200);
+//    }
     
   } catch (e) {
     console.error('載入索引檔失敗', e);
