@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: write  # 授予寫入權限
+  contents: write
 
 jobs:
   sync:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # 使用內建的 token
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create data directory
         run: mkdir -p docs/data
@@ -25,13 +25,21 @@ jobs:
           FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           pip install gdown
-          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok --no-copy-folder-structure
+          # 下載整個資料夾到暫存位置
+          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O /tmp/gdrive_download/ --remaining-ok
+          
+          # 將所有檔案移動到正確位置（不管原本在幾層子資料夾）
+          find /tmp/gdrive_download -type f \( -name "*.json" -o -name "*.txt" \) -exec cp {} docs/data/ \;
+          
+          echo "已複製的檔案："
+          ls -la docs/data/
 
       - name: Create index file
         run: |
           cd docs/data
           echo "[" > units-index.json
           first=true
+          # 處理所有 .json 和 .txt 檔案
           for file in *.json *.txt; do
             if [ "$file" != "units-index.json" ] && [ -f "$file" ]; then
               if [ "$first" = true ]; then
@@ -39,11 +47,14 @@ jobs:
               else
                 echo "," >> units-index.json
               fi
-              filename=$(basename "$file" .${file##*.})
+              # 去除副檔名作為單元 ID
+              filename=$(basename "$file" | sed 's/\.[^.]*$//')
               echo "  {\"unitId\": \"$filename\", \"unitName\": \"$filename\", \"fileName\": \"$file\"}" >> units-index.json
             fi
           done
           echo "]" >> units-index.json
+          echo "產生的索引檔："
+          cat units-index.json
 
       - name: Commit and push changes
         run: |
