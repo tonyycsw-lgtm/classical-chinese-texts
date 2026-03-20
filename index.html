@@ -958,73 +958,97 @@
   };
 
   // 固定 tooltip 控制 - 加入除錯資訊
-  const FixedTooltip = {
-    tooltipEl: document.getElementById('fixed-tooltip'),
-    currentSliceKey: null,
+  
+// 固定 tooltip 控制 - 加入延遲隱藏
+const FixedTooltip = {
+  tooltipEl: document.getElementById('fixed-tooltip'),
+  currentSliceKey: null,
+  hideTimer: null,  // 新增：延遲隱藏計時器
 
-    generateSliceContent(paraNum, sliceId) {
-      const key = paraNum + '-' + sliceId;
-      const sliceData = sliceContents[key];
-      
-      // 除錯：檢查 sliceData
-      if (!sliceData) {
-        console.log('generateSliceContent: 找不到 sliceData', { key, sliceContents });
-        return '';
+  generateSliceContent(paraNum, sliceId) {
+    const key = paraNum + '-' + sliceId;
+    const sliceData = sliceContents[key];
+    
+    // 除錯：檢查 sliceData
+    if (!sliceData) {
+      console.log('generateSliceContent: 找不到 sliceData', { key, sliceContents });
+      return '';
+    }
+    
+    const sliceText = sliceData.text;
+    const translation = sliceData.translation;
+    
+    // 取得詞彙解釋
+    const vocabItems = (sliceData.vocabIds || []).map(id => {
+      const v = currentUnitData?.vocabulary.find(v => v.id === id);
+      if (!v) {
+        console.log('找不到詞彙 ID:', id);
+        return null;
       }
-      
-      const sliceText = sliceData.text;
-      const translation = sliceData.translation;
-      
-      // 取得詞彙解釋
-      const vocabItems = (sliceData.vocabIds || []).map(id => {
-        const v = currentUnitData?.vocabulary.find(v => v.id === id);
-        if (!v) {
-          console.log('找不到詞彙 ID:', id);
-          return null;
-        }
-        return '<div class="vocab-item"><strong>' + v.word + '</strong> ' + v.meaning + '</div>';
-      }).filter(Boolean);
+      return '<div class="vocab-item"><strong>' + v.word + '</strong> ' + v.meaning + '</div>';
+    }).filter(Boolean);
 
-      let html = '<div class="phrase">「' + sliceText + '」 ' + translation + '</div>';
-      if (vocabItems.length) {
-        html += '<div class="vocab-list">' + vocabItems.join('') + '</div>';
-      } else {
-        html += '<div class="vocab-list">（無核心詞彙）</div>';
-      }
-      
-      return html;
-    },
+    let html = '<div class="phrase">「' + sliceText + '」 ' + translation + '</div>';
+    if (vocabItems.length) {
+      html += '<div class="vocab-list">' + vocabItems.join('') + '</div>';
+    } else {
+      html += '<div class="vocab-list">（無核心詞彙）</div>';
+    }
+    
+    return html;
+  },
 
-    show(paraNum, sliceId) {
-  const key = paraNum + '-' + sliceId;
-  console.log('滑鼠懸停:', { paraNum, sliceId, key });
-  
-  if (this.currentSliceKey === key && this.tooltipEl.classList.contains('show')) return;
-  
-  const content = this.generateSliceContent(paraNum, sliceId);
-  console.log('生成的內容:', content);
-  
-  if (!content) return;
-  
-  this.currentSliceKey = key;
-  
-  // 更新內容區域，保留標頭結構
-  const contentArea = document.getElementById('tooltip-content');
-  if (contentArea) {
-    contentArea.innerHTML = content;
-  } else {
-    // 向後兼容：如果找不到 content 區域，更新整個容器
-    this.tooltipEl.innerHTML = content;
-  }
-  
-  this.tooltipEl.classList.add('show');
-},
+  show(paraNum, sliceId) {
+    const key = paraNum + '-' + sliceId;
+    console.log('滑鼠懸停:', { paraNum, sliceId, key });
+    
+    // 新增：清除之前的隱藏計時器
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+    
+    if (this.currentSliceKey === key && this.tooltipEl.classList.contains('show')) return;
+    
+    const content = this.generateSliceContent(paraNum, sliceId);
+    console.log('生成的內容:', content);
+    
+    if (!content) return;
+    
+    this.currentSliceKey = key;
+    
+    // 更新內容區域，保留標頭結構
+    const contentArea = document.getElementById('tooltip-content');
+    if (contentArea) {
+      contentArea.innerHTML = content;
+    } else {
+      // 向後兼容：如果找不到 content 區域，更新整個容器
+      this.tooltipEl.innerHTML = content;
+    }
+    
+    this.tooltipEl.classList.add('show');
+  },
 
-    hide() {
+  // 修改：延遲隱藏（給用戶時間移動滑鼠到 Tooltip）
+  hide() {
+    if (this.hideTimer) clearTimeout(this.hideTimer);
+    this.hideTimer = setTimeout(() => {
       this.tooltipEl.classList.remove('show');
       this.currentSliceKey = null;
+      this.hideTimer = null;
+    }, 300);  // 300 毫秒延遲，可調整
+  },
+
+  // 新增：立即隱藏（用於滑鼠離開 Tooltip 時）
+  hideImmediately() {
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
     }
-  };
+    this.tooltipEl.classList.remove('show');
+    this.currentSliceKey = null;
+  }
+};
 
   // 句子高亮控制
   const SliceHover = {
@@ -1272,33 +1296,63 @@
       });
     },
 
-    attachSliceTooltips() {
-      console.log('綁定 tooltip 事件...');
-      document.querySelectorAll('.sentence-slice').forEach(slice => {
-        if (slice.hasAttribute('data-tooltip-bound')) return;
-        slice.setAttribute('data-tooltip-bound', 'true');
-        const paraNum = slice.dataset.para;
-        const sliceId = slice.dataset.sliceId;
-        slice.addEventListener('mouseenter', () => FixedTooltip.show(parseInt(paraNum), parseInt(sliceId)));
-        slice.addEventListener('mouseleave', () => FixedTooltip.hide());
-      });
-      console.log('tooltip 事件綁定完成');
-    },
+attachSliceTooltips() {
+  console.log('綁定 tooltip 事件...');
+  
+  // 1. 句子懸停
+  document.querySelectorAll('.sentence-slice').forEach(slice => {
+    if (slice.hasAttribute('data-tooltip-bound')) return;
+    slice.setAttribute('data-tooltip-bound', 'true');
+    const paraNum = slice.dataset.para;
+    const sliceId = slice.dataset.sliceId;
+    slice.addEventListener('mouseenter', () => FixedTooltip.show(parseInt(paraNum), parseInt(sliceId)));
+    slice.addEventListener('mouseleave', () => FixedTooltip.hide());  // 延遲隱藏
+  });
+  
+  // 2. 翻譯懸停
+  document.querySelectorAll('.translation-sentence').forEach(trans => {
+    if (trans.hasAttribute('data-trans-tooltip-bound')) return;
+    trans.setAttribute('data-trans-tooltip-bound', 'true');
+    const paraNum = trans.dataset.para;
+    const sliceId = trans.dataset.sliceId;
+    trans.addEventListener('mouseenter', () => FixedTooltip.show(parseInt(paraNum), parseInt(sliceId)));
+    trans.addEventListener('mouseleave', () => FixedTooltip.hide());  // 延遲隱藏
+  });
+  
+  // 3. Tooltip 本身的事件（讓滑鼠可以移到 Tooltip 上）
+  const tooltip = document.getElementById('fixed-tooltip');
+  if (tooltip && !tooltip.hasAttribute('data-tooltip-self-bound')) {
+    tooltip.setAttribute('data-tooltip-self-bound', 'true');
+    tooltip.addEventListener('mouseenter', () => {
+      // 滑鼠進入 Tooltip 時，取消隱藏計時器
+      if (FixedTooltip.hideTimer) {
+        clearTimeout(FixedTooltip.hideTimer);
+        FixedTooltip.hideTimer = null;
+      }
+    });
+    tooltip.addEventListener('mouseleave', () => {
+      // 滑鼠離開 Tooltip 時，立即隱藏
+      FixedTooltip.hideImmediately();
+    });
+  }
+  
+  console.log('tooltip 事件綁定完成');
+}
 
-    attachTranslationHoverTooltip(unitId) {
-      document.querySelectorAll('.translation-sentence').forEach(trans => {
-        if (trans.hasAttribute('data-trans-tooltip')) return;
-        trans.setAttribute('data-trans-tooltip', 'true');
-        trans.addEventListener('mouseenter', (e) => {
-          const paraNum = e.target.dataset.para;
-          const sliceId = e.target.dataset.sliceId;
-          if (paraNum && sliceId) {
-            FixedTooltip.show(parseInt(paraNum), parseInt(sliceId));
-          }
-        });
-        trans.addEventListener('mouseleave', () => FixedTooltip.hide());
-      });
-    },
+   attachTranslationHoverTooltip(unitId) {
+  document.querySelectorAll('.translation-sentence').forEach(trans => {
+    if (trans.hasAttribute('data-trans-tooltip')) return;
+    trans.setAttribute('data-trans-tooltip', 'true');
+    trans.addEventListener('mouseenter', (e) => {
+      const paraNum = e.target.dataset.para;
+      const sliceId = e.target.dataset.sliceId;
+      if (paraNum && sliceId) {
+        FixedTooltip.show(parseInt(paraNum), parseInt(sliceId));
+      }
+    });
+    trans.addEventListener('mouseleave', () => FixedTooltip.hide());  // 延遲隱藏
+  });
+},
 
     showTranslation(paraNum, unitId) {
       const trans = document.getElementById(unitId + '_trans-' + paraNum);
