@@ -2,8 +2,8 @@ name: Sync from Google Drive
 
 on:
   schedule:
-    - cron: '0 */3 * * *'      # 每3小時執行一次
-  workflow_dispatch:            # 允許手動執行
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -21,14 +21,12 @@ jobs:
       - name: Create data directory
         run: mkdir -p docs/data
 
-      # ===== 新增：清空目錄（解決刪除問題）=====
       - name: Clean data directory
         run: |
           echo "🧹 清空 docs/data/ 目錄..."
           rm -rf docs/data/*
           mkdir -p docs/data
           echo "✅ 目錄已清空，準備重新下載"
-      # ===== 新增結束 =====
 
       - name: Install gdown
         run: pip install gdown
@@ -38,9 +36,16 @@ jobs:
           FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: |
           echo "📂 開始從 Google Drive 下載..."
-          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O docs/data/ --remaining-ok
-          echo "✅ 下載完成"
-          echo "📁 已下載 $(ls docs/data/*.json 2>/dev/null | wc -l) 個 JSON 檔案"
+          # 先下載到暫存目錄
+          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O /tmp/gdrive/ --remaining-ok
+          
+          # 將所有 JSON 檔案複製到正確位置
+          echo "📁 移動 JSON 檔案到 docs/data/ ..."
+          find /tmp/gdrive -type f -name "*.json" -exec cp {} docs/data/ \;
+          
+          # 顯示已複製的檔案
+          JSON_COUNT=$(ls docs/data/*.json 2>/dev/null | wc -l)
+          echo "📁 已複製 $JSON_COUNT 個 JSON 檔案"
 
       - name: Validate JSON files
         run: |
@@ -63,6 +68,7 @@ jobs:
       - name: Create index file
         run: |
           cd docs/data
+          
           echo "[" > units-index.json
           first=true
           
@@ -74,13 +80,18 @@ jobs:
                 echo "," >> units-index.json
               fi
               
-              unitName=$(grep -o '"unitName"[[:space:]]*:[[:space:]]*"[^"]*"' "$file" | head -1 | sed 's/"unitName"[[:space:]]*:[[:space:]]*"//g' | sed 's/"//g')
+              # 使用 jq 讀取 unitName（正確處理中文）
+              if command -v jq &> /dev/null; then
+                unitName=$(jq -r '.unitName // ""' "$file" 2>/dev/null)
+              fi
               
               if [ -z "$unitName" ]; then
                 unitName=$(basename "$file" .json)
               fi
               
-              echo "  {\"unitId\": \"$(basename "$file" .json)\", \"unitName\": \"$unitName\", \"fileName\": \"$file\"}" >> units-index.json
+              unitId=$(basename "$file" .json)
+              
+              printf '  {\"unitId\": \"%s\", \"unitName\": \"%s\", \"fileName\": \"%s\"}\n' "$unitId" "$unitName" "$file" >> units-index.json
               echo "📄 已加入索引: $unitName"
             fi
           done
