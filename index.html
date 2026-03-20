@@ -140,29 +140,87 @@
     .single-paragraph {
       margin-bottom: 12px;
     }
-    .fixed-tooltip {
-      position: fixed;
-      top: 100px;
-      right: 30px;
-      width: 360px;
-      background: #ffffff;
-      border: 1px solid #e9ecef;
-      box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
-      border-radius: 20px;
-      padding: 20px;
-      font-size: 13px;
-      line-height: 1.7;
-      color: #0f172a;
-      z-index: 1000;
-      transition: opacity 0.2s;
-      opacity: 0;
-      pointer-events: none;
-      max-height: calc(100vh - 140px);
-      overflow-y: auto;
-    }
-    .fixed-tooltip.show {
-      opacity: 1;
-    }
+.fixed-tooltip {
+  position: fixed;
+  top: 100px;
+  right: 30px;
+  width: 360px;
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.15);
+  border-radius: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #0f172a;
+  z-index: 1000;
+  transition: opacity 0.2s, box-shadow 0.2s;
+  opacity: 0;
+  pointer-events: none;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+/* 顯示狀態：可互動 */
+.fixed-tooltip.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 拖曳中的狀態：陰影加深 */
+.fixed-tooltip.dragging {
+  box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.3);
+  transition: none;
+  cursor: grabbing;
+}
+
+/* Tooltip 頂部拖曳把手區域 */
+.tooltip-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e9ecef;
+  cursor: grab;
+  user-select: none;
+}
+
+.tooltip-header:active {
+  cursor: grabbing;
+}
+
+/* 拖曳把手圖示 */
+.drag-handle {
+  color: #94a3b8;
+  font-size: 14px;
+  letter-spacing: 2px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.drag-handle:hover {
+  background: #f1f5f9;
+  color: #4f46e5;
+}
+
+.drag-handle i {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+/* 內容區域 */
+.tooltip-content {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+/* 手機版自動隱藏（已存在，確認保留） */
+@media screen and (max-width: 768px) {
+  .fixed-tooltip {
+    display: none;
+  }
+}
     .fixed-tooltip .phrase {
       color: #1e40af;
       font-weight: 600;
@@ -505,7 +563,16 @@
   </div>
 </div>
 
-<div id="fixed-tooltip" class="fixed-tooltip"></div>
+<div id="fixed-tooltip" class="fixed-tooltip">
+  <div class="tooltip-header" id="tooltip-drag-handle">
+    <div class="drag-handle">
+      <i class="fas fa-grip-vertical"></i> ⋮⋮
+    </div>
+  </div>
+  <div class="tooltip-content" id="tooltip-content">
+    <!-- 動態內容會放在這裡 -->
+  </div>
+</div>
 
 <script>
   // 全域變數 - 已修復：加入 window.sliceContents 同步
@@ -929,21 +996,29 @@
     },
 
     show(paraNum, sliceId) {
-      const key = paraNum + '-' + sliceId;
-      console.log('滑鼠懸停:', { paraNum, sliceId, key });
-      console.log('sliceContents[key]:', sliceContents[key]);
-      
-      if (this.currentSliceKey === key && this.tooltipEl.classList.contains('show')) return;
-      
-      const content = this.generateSliceContent(paraNum, sliceId);
-      console.log('生成的內容:', content);
-      
-      if (!content) return;
-      
-      this.currentSliceKey = key;
-      this.tooltipEl.innerHTML = content;
-      this.tooltipEl.classList.add('show');
-    },
+  const key = paraNum + '-' + sliceId;
+  console.log('滑鼠懸停:', { paraNum, sliceId, key });
+  
+  if (this.currentSliceKey === key && this.tooltipEl.classList.contains('show')) return;
+  
+  const content = this.generateSliceContent(paraNum, sliceId);
+  console.log('生成的內容:', content);
+  
+  if (!content) return;
+  
+  this.currentSliceKey = key;
+  
+  // 更新內容區域，保留標頭結構
+  const contentArea = document.getElementById('tooltip-content');
+  if (contentArea) {
+    contentArea.innerHTML = content;
+  } else {
+    // 向後兼容：如果找不到 content 區域，更新整個容器
+    this.tooltipEl.innerHTML = content;
+  }
+  
+  this.tooltipEl.classList.add('show');
+},
 
     hide() {
       this.tooltipEl.classList.remove('show');
@@ -1359,6 +1434,82 @@ document.getElementById('unit-select').addEventListener('change', function(e) {
   }
 
   window.onload = loadUnitsIndex;
+// ============================================
+// Tooltip 可拖曳功能
+// ============================================
+(function initDraggableTooltip() {
+  const tooltip = document.getElementById('fixed-tooltip');
+  const dragHandle = document.getElementById('tooltip-drag-handle');
+  
+  if (!tooltip || !dragHandle) return;
+  
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let tooltipLeft = 0, tooltipTop = 0;
+  
+  // 開始拖曳
+  function startDrag(e) {
+    // 只允許透過把手拖曳
+    if (!dragHandle.contains(e.target)) return;
+    
+    isDragging = true;
+    tooltip.classList.add('dragging');
+    
+    // 記錄起始滑鼠位置
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    
+    // 獲取當前位置（考慮 transform 和定位）
+    const rect = tooltip.getBoundingClientRect();
+    tooltipLeft = rect.left;
+    tooltipTop = rect.top;
+    
+    // 切換為 left 定位（覆蓋原有的 right 定位）
+    tooltip.style.right = 'auto';
+    tooltip.style.left = tooltipLeft + 'px';
+    tooltip.style.top = tooltipTop + 'px';
+    
+    // 防止拖曳時選中文字
+    e.preventDefault();
+  }
+  
+  // 拖曳中
+  function onDrag(e) {
+    if (!isDragging) return;
+    
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    
+    let newLeft = tooltipLeft + dx;
+    let newTop = tooltipTop + dy;
+    
+    // 邊界限制（避免拖出螢幕外）
+    const maxLeft = window.innerWidth - tooltip.offsetWidth;
+    const maxTop = window.innerHeight - tooltip.offsetHeight;
+    
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    newTop = Math.max(0, Math.min(newTop, maxTop));
+    
+    tooltip.style.left = newLeft + 'px';
+    tooltip.style.top = newTop + 'px';
+  }
+  
+  // 結束拖曳
+  function stopDrag() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    tooltip.classList.remove('dragging');
+  }
+  
+  // 綁定事件
+  dragHandle.addEventListener('mousedown', startDrag);
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', stopDrag);
+  
+  // 防止拖曳時滑鼠離開工具條
+  dragHandle.addEventListener('dragstart', (e) => e.preventDefault());
+})();
 </script>
 </body>
 </html>
